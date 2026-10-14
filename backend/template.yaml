@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Bio AI Assistant API
+
+Parameters:
+  GroqApiKeys:
+    Type: String
+    NoEcho: true
+    Description: Comma-separated Groq API keys (rotated on rate limit)
+  GroqModel:
+    Type: String
+    Default: llama-3.3-70b-versatile
+  QdrantUrl:
+    Type: String
+    Default: ''
+  QdrantApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+  AllowedOrigin:
+    Type: String
+    Default: '*'
+
+Globals:
+  Function:
+    Runtime: python3.11
+    CodeUri: src/
+    Timeout: 29
+    MemorySize: 512
+    Environment:
+      Variables:
+        GROQ_API_KEYS: !Ref GroqApiKeys
+        GROQ_MODEL: !Ref GroqModel
+        QDRANT_URL: !Ref QdrantUrl
+        QDRANT_API_KEY: !Ref QdrantApiKey
+
+Resources:
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedOrigin
+        AllowMethods: [POST, OPTIONS]
+        AllowHeaders: [Content-Type]
+
+  SearchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: search.handler
+      Events:
+        Search:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /proteins/search
+            Method: POST
+
+  PredictFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: predict.handler
+      Events:
+        Predict:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /docking/predict
+            Method: POST
+
+  AgentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: agent.handler
+      Events:
+        Chat:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /agent/chat
+            Method: POST
+
+Outputs:
+  ApiUrl:
+    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com'

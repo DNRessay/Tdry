@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.aws-sam/
+__pycache__/
+.env
+samconfig.toml

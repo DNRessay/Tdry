@@ -28,7 +28,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Build
         working-directory: backend
@@ -37,10 +37,10 @@ jobs:
       - name: Deploy
         working-directory: backend
         env:
-          GROQ_API_KEYS: ${{ secrets.GROQ_API_KEYS }}
-          QDRANT_URL: ${{ vars.QDRANT_URL }}
+          GROQ_API_KEYS: ${{ secrets.GROQ_API_KEY }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
           QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
-          ORIGIN: ${{ vars.FRONTEND_ORIGIN }}
+          ORIGIN: ${{ secrets.FRONTEND_ORIGIN }}
         run: |
           sam deploy \
             --stack-name bio-ai-assistant \

@@ -1,0 +1,60 @@
+name: Deploy backend
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**', '.github/workflows/deploy.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Build
+        working-directory: backend
+        run: sam build
+
+      - name: Deploy
+        working-directory: backend
+        env:
+          GROQ_API_KEYS: ${{ secrets.GROQ_API_KEYS }}
+          QDRANT_URL: ${{ vars.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          ORIGIN: ${{ vars.FRONTEND_ORIGIN }}
+        run: |
+          sam deploy \
+            --stack-name bio-ai-assistant \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              "GroqApiKeys=\"$GROQ_API_KEYS\"" \
+              "QdrantUrl=\"$QDRANT_URL\"" \
+              "QdrantApiKey=\"$QDRANT_API_KEY\"" \
+              "AllowedOrigin=\"$ORIGIN\""
+
+      - name: Show API URL
+        run: |
+          aws cloudformation describe-stacks --stack-name bio-ai-assistant \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text

@@ -1,6 +1,5 @@
-name = "tdry-lab"
+name = "t-dry-lab"
 compatibility_date = "2024-09-01"
-pages_build_output_dir = "frontend/dist"
 
 [assets]
 directory = "frontend/dist"

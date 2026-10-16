@@ -31,8 +31,8 @@ export default function AgentChat() {
   }
 
   return (
-    <section className="panel chat">
-      <h2>Ask the agent</h2>
+    <section className="chat">
+      <h3>Ask the assistant</h3>
       <div className="log">
         {!turns.length && <p className="muted">Try: “Find human JAK3 and score tofacitinib against it.”</p>}
         {turns.map((t, i) => (

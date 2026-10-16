@@ -106,7 +106,7 @@ def call_stage(env, payload):
     return r.json()
 
 
-def run_loop(seq, max_loops):
+def run_loop(seq, max_loops, prefer=None):
     acc = accessibility(seq)
     if not acc["regions"]:
         return {"status": "failed_inaccessible", "accessibility": acc, "loops": [], "note": "No open region; target RNA is folded shut. Stopped before any protein design."}
@@ -118,7 +118,8 @@ def run_loop(seq, max_loops):
         remaining = [h for h in hits if (h["motif"], h["start"]) not in {(t["motif"], t["start"]) for t in tried}]
         if not remaining:
             break
-        site = groq_pick(seq, remaining, tried)
+        pref = next((h for h in remaining if prefer and h["motif"] == prefer.get("motif") and h["start"] == prefer.get("start")), None) if i == 1 else None
+        site = pref or groq_pick(seq, remaining, tried)
         entry = {"loop": i, "site": site}
         design = call_stage("BINDER_URL", {"rna": seq, "site": site})
         if design is None:
@@ -147,4 +148,8 @@ def handler(data):
         max_loops = int(data.get("max_loops", 5))
     except (TypeError, ValueError):
         raise ApiError(400, "max_loops must be an integer")
-    return run_loop(seq, max(1, min(max_loops, HARD_MAX_LOOPS)))
+    if data.get("analyze"):
+        acc = accessibility(seq)
+        return {"accessibility": acc, "motifs": motif_hits(seq, acc["regions"])}
+    prefer = data.get("site") if isinstance(data.get("site"), dict) else None
+    return run_loop(seq, max(1, min(max_loops, HARD_MAX_LOOPS)), prefer)

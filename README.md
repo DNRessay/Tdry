@@ -4,6 +4,10 @@ Pre-screens proteins and compounds before lab work. React (Vite + TS) on Cloudfl
 
 Docking scores are a heuristic pre-screen (sequence composition, ligand physicochemical properties from PubChem, AlphaFold pLDDT). They are not physics-based docking. Use them to narrow candidates, then confirm with AutoDock Vina or DiffDock.
 
+## Flow
+
+One card at a time: project name, target type (protein, mRNA, plant DNA; generic DNA is shown as unavailable), target details (protein search and structure, mRNA folding check and motif pick, or plant DNA paste), binder step (compound, design attempts, or mutations), then results. The assistant chat opens from the results card.
+
 ## Endpoints
 
 | Route | Payload |
@@ -11,7 +15,7 @@ Docking scores are a heuristic pre-screen (sequence composition, ligand physicoc
 | `POST /proteins/search` | `{"query": "caspase-9", "species": "generic"}` |
 | `POST /docking/predict` | `{"protein_id": "P55211", "target_compound": "imatinib"}` |
 | `POST /agent/chat` | `{"messages": [{"role": "user", "content": "..."}]}` |
-| `POST /rna/design` | `{"sequence": "AUGUUU...", "max_loops": 5}` |
+| `POST /rna/design` | `{"sequence": "AUGUUU...", "max_loops": 5, "site": {"motif": "PUM1", "start": 11}}` or `{"sequence": "...", "analyze": true}` for folding and motifs only |
 | `POST /plant/variants` | `{"sequence": "<plant DNA>", "variants": [{"pos": 251, "alt": "C"}]}` |
 
 `target_compound` is a PubChem name or CID.

@@ -32,6 +32,20 @@ Parameters:
   NovoUrl:
     Type: String
     Default: ''
+    Description: Modal base URL from services/novo/modal_app.py (the tdry-novo-api endpoint)
+  NovoToken:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Bearer token shared with the Modal secret novo-aws (NOVO_TOKEN)
+  NovoAccessCode:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Code users must enter to start a campaign
+  NovoRetentionDays:
+    Type: Number
+    Default: 90
 
 Globals:
   Function:
@@ -49,6 +63,9 @@ Globals:
         SCORE_URL: !Ref ScoreUrl
         BOTANIC_URL: !Ref BotanicUrl
         NOVO_URL: !Ref NovoUrl
+        NOVO_TOKEN: !Ref NovoToken
+        NOVO_ACCESS_CODE: !Ref NovoAccessCode
+        NOVO_BUCKET: !Ref NovoBucket
 
 Resources:
   Api:
@@ -132,18 +149,105 @@ Resources:
             Path: /lookup
             Method: POST
 
-  NovoFunction:
+  NovoBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-campaigns
+            Status: Enabled
+            Prefix: novo/
+            ExpirationInDays: !Ref NovoRetentionDays
+
+  NovoWriter:
+    Type: AWS::IAM::User
+    Properties:
+      Policies:
+        - PolicyName: novo-bucket
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub '${NovoBucket.Arn}/novo/*'
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt NovoBucket.Arn
+
+  NovoSubmitFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: novo.handler
+      Handler: novo.submit
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref NovoBucket
       Events:
-        Novo:
+        NovoSubmit:
           Type: HttpApi
           Properties:
             ApiId: !Ref Api
-            Path: /novo/design
+            Path: /novo/submit
+            Method: POST
+
+  NovoStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: novo.status
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref NovoBucket
+      Events:
+        NovoStatus:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /novo/status
+            Method: POST
+
+  NovoResumeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: novo.resume
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref NovoBucket
+      Events:
+        NovoResume:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /novo/resume
+            Method: POST
+
+  NovoDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: novo.download
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref NovoBucket
+      Events:
+        NovoDownload:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /novo/download
             Method: POST
 
 Outputs:
+  NovoBucketName:
+    Value: !Ref NovoBucket
+  NovoWriterUser:
+    Value: !Ref NovoWriter
   ApiUrl:
     Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com'

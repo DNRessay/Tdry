@@ -79,5 +79,38 @@ export type LookupSeq = { sequence: string; length: number; truncated: boolean; 
 export const lookupSearch = (type: LookupKind, query: string) => post<{ results: LookupHit[] }>('/lookup', { type, query })
 export const lookupFetch = (type: 'mrna' | 'plantdna', id: string) => post<LookupSeq>('/lookup', { type, action: 'fetch', id })
 
-export type NovoResult = { status: string; designs?: { id?: string; sequence?: string; plddt?: number }[]; note?: string }
-export const designNovo = (compound: string, protein_accession?: string) => post<NovoResult>('/novo/design', { compound, protein_accession })
+export type EnzymeDesign = {
+  name: string
+  score: number
+  sequence: string
+  metrics: Record<string, number | string>
+  files: { label: string; key: string }[]
+}
+export type EnzymeJob = {
+  job_id: string
+  status: 'queued' | 'running' | 'done' | 'error' | 'stalled'
+  stage?: string
+  counts?: Record<string, number>
+  total?: number
+  error?: string | null
+  designs?: EnzymeDesign[]
+  notice?: string
+}
+export type EnzymeInput = {
+  name: string
+  cif: string
+  motif_str: string
+  motif_atoms: string
+  seq_length: string
+  is_author_naming: boolean
+  num_designs: number
+  ligands: { id: string; ccd_code: string }[]
+  suite: string
+  access_code: string
+  noncommercial: boolean
+}
+
+export const submitEnzyme = (input: EnzymeInput) => post<{ job_id: string }>('/novo/submit', input)
+export const enzymeStatus = (job_id: string) => post<EnzymeJob>('/novo/status', { job_id })
+export const resumeEnzyme = (job_id: string) => post<EnzymeJob>('/novo/resume', { job_id })
+export const enzymeFile = (job_id: string, key: string) => post<{ url: string }>('/novo/download', { job_id, key })

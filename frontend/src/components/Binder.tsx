@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { designRna, predictDocking, scorePlantVariants, Protein, RnaSite } from '../api'
+import { useEffect, useMemo, useState } from 'react'
+import { designNovo, designRna, LookupHit, lookupSearch, predictDocking, scorePlantVariants, Protein, RnaSite } from '../api'
 import Card from './Card'
 import { Kind } from './KindStep'
 import { clean } from './PlantTarget'
@@ -13,8 +13,6 @@ type Props = {
   onDone: (r: ResultData) => void
   onBack: () => void
 }
-
-const COMPOUNDS = ['imatinib', 'tofacitinib', 'aspirin']
 
 function parseVariants(text: string, seq: string) {
   const items = text.split(/[\s,;]+/).filter(Boolean)
@@ -34,10 +32,41 @@ export default function Binder({ kind, protein, seq, site, onDone, onBack }: Pro
   const [loops, setLoops] = useState(5)
   const [vtext, setVtext] = useState('')
   const [busy, setBusy] = useState(false)
+  const [suggest, setSuggest] = useState<string[]>([])
+  const [known, setKnown] = useState<LookupHit[] | null>(null)
   const [error, setError] = useState('')
   const dna = clean(seq)
   const parsed = useMemo(() => parseVariants(vtext, dna), [vtext, dna])
   const goodVariants = parsed.filter((v) => !('error' in v)) as { pos: number; alt: string; ref: string }[]
+
+  useEffect(() => {
+    if (kind !== 'protein' || !protein) return
+    let stale = false
+    lookupSearch('binder', protein.accession)
+      .then((r) => !stale && setKnown(r.results))
+      .catch(() => !stale && setKnown([]))
+    return () => {
+      stale = true
+    }
+  }, [kind, protein])
+
+  useEffect(() => {
+    const q = compound.trim()
+    if (kind !== 'protein' || q.length < 2) {
+      setSuggest([])
+      return
+    }
+    let stale = false
+    const timer = setTimeout(() => {
+      lookupSearch('compound', q)
+        .then((r) => !stale && setSuggest(r.results.map((x) => x.title).filter((n) => n.toLowerCase() !== q.toLowerCase())))
+        .catch(() => !stale && setSuggest([]))
+    }, 300)
+    return () => {
+      stale = true
+      clearTimeout(timer)
+    }
+  }, [compound, kind])
 
   async function go(fn: () => Promise<ResultData>) {
     setBusy(true)
@@ -53,18 +82,32 @@ export default function Binder({ kind, protein, seq, site, onDone, onBack }: Pro
 
   if (kind === 'protein')
     return (
-      <Card question="Which compound should it bind?" hint="A PubChem name or CID. Scores are a quick pre-screen, not physics-based docking." onBack={onBack}>
+      <Card question="Which compound should it bind?" hint="Start from a known binder, type a PubChem name or CID, or ask AlphaProtein Novo for a new design. Scores are a quick pre-screen, not physics-based docking." wide onBack={onBack}>
+        <h3>Known binders for {protein?.name}</h3>
+        {known === null && <p className="muted">Looking up ChEMBL…</p>}
+        {known && !known.length && <p className="muted">ChEMBL has no measured binders for this protein. Type a compound below.</p>}
+        {known && known.length > 0 && (
+          <ul className="picks grid">
+            {known.map((k) => (
+              <li key={k.id}>
+                <button className={compound === k.id ? 'pick active' : 'pick'} onClick={() => setCompound(k.id)}>
+                  <strong>{k.title}</strong>
+                  <span>{k.detail}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <h3>Or type your own</h3>
         <input
           className="big"
-          autoFocus
-          value={compound}
-          placeholder="e.g. imatinib"
+          value={compound.startsWith('smiles:') ? '' : compound}
+          placeholder={compound.startsWith('smiles:') ? 'Selected from the list above' : 'e.g. imatinib'}
           onChange={(e) => setCompound(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && compound.trim() && protein && go(async () => ({ kind: 'protein', data: await predictDocking(protein.accession, compound.trim()) }))}
           aria-label="Compound"
         />
         <div className="chips">
-          {COMPOUNDS.map((c) => (
+          {suggest.map((c) => (
             <button key={c} className="chip" onClick={() => setCompound(c)}>
               {c}
             </button>
@@ -72,8 +115,11 @@ export default function Binder({ kind, protein, seq, site, onDone, onBack }: Pro
         </div>
         {error && <p className="error">{error}</p>}
         <div className="actions">
+          <button className="ghost" disabled={busy || !compound.trim() || compound.startsWith('smiles:')} onClick={() => go(async () => ({ kind: 'novo', data: await designNovo(compound.trim(), protein?.accession) }))}>
+            Design a new one with Novo
+          </button>
           <button disabled={busy || !compound.trim() || !protein} onClick={() => go(async () => ({ kind: 'protein', data: await predictDocking(protein!.accession, compound.trim()) }))}>
-            {busy ? 'Scoring…' : 'Score it'}
+            {busy ? 'Working…' : 'Score it'}
           </button>
         </div>
       </Card>

@@ -29,6 +29,9 @@ Parameters:
   BotanicUrl:
     Type: String
     Default: ''
+  NovoUrl:
+    Type: String
+    Default: ''
 
 Globals:
   Function:
@@ -45,6 +48,7 @@ Globals:
         BINDER_URL: !Ref BinderUrl
         SCORE_URL: !Ref ScoreUrl
         BOTANIC_URL: !Ref BotanicUrl
+        NOVO_URL: !Ref NovoUrl
 
 Resources:
   Api:
@@ -114,6 +118,30 @@ Resources:
           Properties:
             ApiId: !Ref Api
             Path: /plant/variants
+            Method: POST
+
+  LookupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: lookup.handler
+      Events:
+        Lookup:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /lookup
+            Method: POST
+
+  NovoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: novo.handler
+      Events:
+        Novo:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /novo/design
             Method: POST
 
 Outputs:

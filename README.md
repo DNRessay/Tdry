@@ -8,6 +8,16 @@ Docking scores are a heuristic pre-screen (sequence composition, ligand physicoc
 
 One card at a time: project name, target type (protein, mRNA, plant DNA; generic DNA is shown as unavailable), target details (protein search and structure, mRNA folding check and motif pick, or plant DNA paste), binder step (compound, design attempts, or mutations), then results. The assistant chat opens from the results card.
 
+## Public database lookup
+
+`POST /lookup` finds sequences when the user has none at hand. `{"type": "mrna", "query": "PUM1"}` searches NCBI RefSeq mRNAs; `{"type": "plantdna", "query": "PHYB"}` searches NCBI Gene for plant genes and fetches the gene's genomic window (first 8,191 bases from the 5' end); `{"type": "compound", "query": "imat"}` autocompletes PubChem compound names. Add `"action": "fetch", "id": "<id from search>"` to get the sequence. Optional env `NCBI_API_KEY` and `NCBI_EMAIL` raise the NCBI rate limit.
+
+## Known binders and AlphaProtein Novo
+
+On the protein binder step, `POST /lookup` with `{"type": "binder", "query": "<UniProt accession>"}` returns the strongest known ligands for that protein from ChEMBL (open data), ranked by pChEMBL. Unnamed molecules are passed on as `smiles:<SMILES>` and resolved through PubChem when scored.
+
+`POST /novo/design` forwards `{compound, protein_accession}` to your own AlphaProtein Novo host (`NovoUrl` at deploy) at `POST {NovoUrl}/design`, expected to return `{status, designs: [{id, sequence, plddt}], note}`. AP Novo is a de novo enzyme design pipeline (Google DeepMind, Apache 2.0 code). Its weights are downloaded separately under Google's terms of use and prohibited use policy, and it also needs AlphaFold 3 leaving-atom weights under the AlphaFold 3 terms. It needs a GPU, so write a thin wrapper service around its CLI; this repo only holds the client side.
+
 ## Endpoints
 
 | Route | Payload |

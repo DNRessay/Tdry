@@ -14,8 +14,12 @@ HYDROPHOBIC = set("AVILMFWC")
 
 
 def fetch_ligand(compound):
-    key = "cid" if compound.isdigit() else "name"
-    r = requests.get(f"{PUBCHEM}/{key}/{quote(compound)}/property/{PROPS}/JSON", timeout=15)
+    if compound.startswith("smiles:"):
+        url = f"{PUBCHEM}/smiles/{quote(compound[7:], safe='')}/property/{PROPS}/JSON"
+    else:
+        key = "cid" if compound.isdigit() else "name"
+        url = f"{PUBCHEM}/{key}/{quote(compound)}/property/{PROPS}/JSON"
+    r = requests.get(url, timeout=15)
     if r.status_code == 404:
         raise ApiError(422, f"compound '{compound}' not found in PubChem (use a compound name or CID)")
     r.raise_for_status()

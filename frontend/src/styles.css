@@ -147,3 +147,29 @@ button.chip:hover { border-color: var(--ink); }
   main { animation: none; }
   .kind { transition: none; }
 }
+
+.lookup { border-top: 1.5px dashed var(--line); padding-top: 0.25rem; }
+.lookup h3 { margin-top: 0.75rem; font-size: 0.98rem; }
+.lookup .picks { margin-top: 0.6rem; max-height: 300px; }
+
+.brandrow { display: flex; align-items: baseline; gap: 1rem; }
+.brandrow .link { padding: 0; }
+.history { position: fixed; top: 0; left: 0; bottom: 0; width: min(380px, 100%); background: #fff; padding: 1rem 1.25rem; box-shadow: 20px 0 50px -30px rgba(14, 26, 43, 0.5); z-index: 10; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; }
+.drawer-head { display: flex; justify-content: space-between; align-items: baseline; }
+.drawer-head h3 { margin: 0; }
+.newbtn { background: var(--ink); color: #fff; border: 0; border-radius: 12px; padding: 0.7rem 1rem; font-weight: 600; }
+.hist { border: 1.5px solid var(--line); border-radius: 14px; padding: 0.6rem 0.8rem; display: flex; justify-content: space-between; gap: 0.5rem; align-items: flex-start; }
+.hist.active { border-color: var(--signal); }
+.histopen { background: none; border: 0; padding: 0; text-align: left; color: var(--ink); display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.histopen span { color: var(--muted); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; }
+.print-head { display: none; margin: 0 0 1rem; }
+
+@media print {
+  body { background: #fff; }
+  header, .said, .actions, .back, .drawer, .history, .viewer-wrap { display: none !important; }
+  .shell { padding: 0; max-width: none; }
+  .card { box-shadow: none; max-width: none; padding: 0; border-radius: 0; }
+  main { animation: none; }
+  .print-head { display: block; color: var(--muted); }
+  .rows li, .meter-track, .bar { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}

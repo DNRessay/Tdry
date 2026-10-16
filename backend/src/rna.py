@@ -93,7 +93,7 @@ def groq_pick(seq, candidates, tried):
             c["reason"] = out.get("reason", "")
             return c
         except (ValueError, KeyError, IndexError, TypeError):
-            break
+            continue
     return candidates[0]
 
 

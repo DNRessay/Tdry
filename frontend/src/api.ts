@@ -59,8 +59,12 @@ export type RnaResult = {
   winner?: RnaLoop['design']
 }
 
-export const designRna = (sequence: string, max_loops = 5) =>
-  post<RnaResult>('/rna/design', { sequence, max_loops })
+export type RnaAnalysis = { accessibility: RnaResult['accessibility']; motifs: RnaSite[] }
+
+export const analyzeRna = (sequence: string) => post<RnaAnalysis>('/rna/design', { sequence, analyze: true })
+
+export const designRna = (sequence: string, max_loops = 5, site?: RnaSite) =>
+  post<RnaResult>('/rna/design', { sequence, max_loops, site })
 
 export type PlantScore = { pos: number; ref: string; alt: string; llr: number }
 export type PlantResult = { model: string; results: PlantScore[]; notice: string; interpretation: string }

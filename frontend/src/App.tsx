@@ -4,6 +4,8 @@ import SearchBox from './components/SearchBox'
 import StructureViewer from './components/StructureViewer'
 import DockingPanel from './components/DockingPanel'
 import AgentChat from './components/AgentChat'
+import RnaPanel from './components/RnaPanel'
+import PlantPanel from './components/PlantPanel'
 
 export default function App() {
   const [results, setResults] = useState<Protein[]>([])
@@ -12,7 +14,7 @@ export default function App() {
   return (
     <div className="app">
       <header>
-        <h1>Bio AI Assistant</h1>
+        <h1>T-Dry-Lab</h1>
         <p>Pre-screen proteins and compounds before lab work. Scores are heuristic estimates, not docking simulations.</p>
       </header>
       <main>
@@ -36,6 +38,8 @@ export default function App() {
         </div>
         <div className="col">
           <AgentChat />
+          <RnaPanel />
+          <PlantPanel />
         </div>
       </main>
     </div>

@@ -3,7 +3,7 @@ name: Deploy backend
 on:
   push:
     branches: [main]
-    paths: ['backend/**', '.github/workflows/deploy.yml']
+    paths: ['backend/**', '.github/workflows/main-deploy.yml']
   workflow_dispatch:
 
 concurrency:
@@ -41,6 +41,9 @@ jobs:
           QDRANT_URL: ${{ secrets.QDRANT_URL }}
           QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
           ORIGIN: ${{ secrets.FRONTEND_ORIGIN }}
+          NOVO_URL: ${{ secrets.NOVO_URL }}
+          NOVO_TOKEN: ${{ secrets.NOVO_TOKEN }}
+          NOVO_ACCESS_CODE: ${{ secrets.NOVO_ACCESS_CODE }}
         run: |
           sam deploy \
             --stack-name bio-ai-assistant \
@@ -52,7 +55,10 @@ jobs:
               "GroqApiKeys=\"$GROQ_API_KEYS\"" \
               "QdrantUrl=\"$QDRANT_URL\"" \
               "QdrantApiKey=\"$QDRANT_API_KEY\"" \
-              "AllowedOrigin=\"$ORIGIN\""
+              "AllowedOrigin=\"$ORIGIN\"" \
+              "NovoUrl=\"$NOVO_URL\"" \
+              "NovoToken=\"$NOVO_TOKEN\"" \
+              "NovoAccessCode=\"$NOVO_ACCESS_CODE\""
 
       - name: Show API URL
         run: |

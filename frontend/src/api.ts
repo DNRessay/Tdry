@@ -71,3 +71,13 @@ export type PlantResult = { model: string; results: PlantScore[]; notice: string
 
 export const scorePlantVariants = (sequence: string, variants: { pos: number; alt: string }[]) =>
   post<PlantResult>('/plant/variants', { sequence, variants })
+
+export type LookupHit = { id: string; title: string; organism?: string; length?: number; detail?: string }
+export type LookupKind = 'mrna' | 'plantdna' | 'compound' | 'binder'
+export type LookupSeq = { sequence: string; length: number; truncated: boolean; label: string }
+
+export const lookupSearch = (type: LookupKind, query: string) => post<{ results: LookupHit[] }>('/lookup', { type, query })
+export const lookupFetch = (type: 'mrna' | 'plantdna', id: string) => post<LookupSeq>('/lookup', { type, action: 'fetch', id })
+
+export type NovoResult = { status: string; designs?: { id?: string; sequence?: string; plddt?: number }[]; note?: string }
+export const designNovo = (compound: string, protein_accession?: string) => post<NovoResult>('/novo/design', { compound, protein_accession })

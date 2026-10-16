@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { analyzeRna, RnaAnalysis, RnaSite } from '../api'
 import Card from './Card'
+import SeqLookup from './SeqLookup'
 
 type Props = {
   seq: string
@@ -33,6 +34,7 @@ function Track({ seq, analysis, site }: { seq: string; analysis: RnaAnalysis; si
 export default function MrnaTarget({ seq, setSeq, analysis, setAnalysis, site, setSite, onNext, onBack }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [note, setNote] = useState('')
   const clean = seq.replace(/\s+/g, '').toUpperCase().replace(/T/g, 'U')
 
   async function run() {
@@ -68,6 +70,15 @@ export default function MrnaTarget({ seq, setSeq, analysis, setAnalysis, site, s
         </button>
       </div>
       {error && <p className="error">{error}</p>}
+      {note && <p className="muted">{note}</p>}
+      <SeqLookup
+        kind="mrna"
+        onPick={(s, n) => {
+          setSeq(s)
+          setAnalysis(null)
+          setNote(n)
+        }}
+      />
       {analysis && (
         <>
           <p className="muted">

@@ -1,7 +1,7 @@
 {
-  "name": "t-dry-lab-root",
+  "name": "tdry-lab",
   "private": true,
   "scripts": {
-    "build": "npm --prefix frontend run build"
+    "build": "cd frontend && npm install && npm run build"
   }
 }

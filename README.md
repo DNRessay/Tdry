@@ -1,4 +1,4 @@
-# Bio AI Assistant
+# T-Dry-Lab
 
 Pre-screens proteins and compounds before lab work. React (Vite + TS) on Cloudflare Pages, AWS SAM (Python 3.11) backend.
 
@@ -11,8 +11,31 @@ Docking scores are a heuristic pre-screen (sequence composition, ligand physicoc
 | `POST /proteins/search` | `{"query": "caspase-9", "species": "generic"}` |
 | `POST /docking/predict` | `{"protein_id": "P55211", "target_compound": "imatinib"}` |
 | `POST /agent/chat` | `{"messages": [{"role": "user", "content": "..."}]}` |
+| `POST /rna/design` | `{"sequence": "AUGUUU...", "max_loops": 5}` |
+| `POST /plant/variants` | `{"sequence": "<plant DNA>", "variants": [{"pos": 251, "alt": "C"}]}` |
 
 `target_compound` is a PubChem name or CID.
+
+## RNA binder loop
+
+`/rna/design` runs: ViennaRNA accessibility (MFE + unpaired probability per 8-nt window) -> RBP motif match on open loops (PUM1, RBFOX, HuR, MBNL, LIN28, FUS) -> Groq picks the best site -> binder design service -> Rosetta scoring service. On failure it moves to the next site. Loops are capped (`max_loops`, default 5, hard max 10).
+
+Stops early with `failed_inaccessible` (no open region) before any compute is spent. Binder design and Rosetta run on your own GPU/CPU services: set `BinderUrl` and `ScoreUrl` at deploy. Contracts: binder `POST {rna, site}` -> `{id, sequence, plddt}`; score `POST {rna, site, design}` -> `{pass: bool, ...}`. Without them the endpoint returns `needs_compute` after the accessibility and motif stages. Lambda has a 29 s limit, so keep those services fast or make them async.
+
+## Plant variant scoring (BOTANIC-1)
+
+For **plant genomic DNA only**. BOTANIC-1 (Living Models, `living-models/Botanic1-S/M/L`) is a plant genome model; it scores variant effects (LLR = log P(alt) - log P(ref), strongly negative = likely disruptive). It does not do RNA folding or accessibility, and must not be used for human, animal or viral sequences. Weights are gated on Hugging Face and licensed for non-commercial research use only.
+
+It needs a GPU/CPU host, so it runs as a separate service, not in Lambda:
+
+```bash
+cd services/botanic
+pip install -r requirements.txt
+hf auth login   # after accepting the terms on the model page
+uvicorn app:app --host 0.0.0.0 --port 8000
+```
+
+Set `BotanicUrl` at deploy to that host's base URL. Positions are 0-based; max 8,191 bp and 50 variants per request. `BOTANIC_MODEL` env var on the service picks the size (default `living-models/Botanic1-M`).
 
 ## Backend
 
@@ -37,5 +60,5 @@ Deploy:
 
 ```bash
 npm run build
-npx wrangler pages deploy dist --project-name bio-ai-assistant
+npx wrangler pages deploy dist --project-name t-dry-lab
 ```

@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Bio AI Assistant API
+Description: T-Dry-Lab API
 
 Parameters:
   GroqApiKeys:
@@ -20,6 +20,15 @@ Parameters:
   AllowedOrigin:
     Type: String
     Default: '*'
+  BinderUrl:
+    Type: String
+    Default: ''
+  ScoreUrl:
+    Type: String
+    Default: ''
+  BotanicUrl:
+    Type: String
+    Default: ''
 
 Globals:
   Function:
@@ -33,6 +42,9 @@ Globals:
         GROQ_MODEL: !Ref GroqModel
         QDRANT_URL: !Ref QdrantUrl
         QDRANT_API_KEY: !Ref QdrantApiKey
+        BINDER_URL: !Ref BinderUrl
+        SCORE_URL: !Ref ScoreUrl
+        BOTANIC_URL: !Ref BotanicUrl
 
 Resources:
   Api:
@@ -78,6 +90,30 @@ Resources:
           Properties:
             ApiId: !Ref Api
             Path: /agent/chat
+            Method: POST
+
+  RnaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: rna.handler
+      Events:
+        Rna:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /rna/design
+            Method: POST
+
+  PlantFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: plant.handler
+      Events:
+        Plant:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /plant/variants
             Method: POST
 
 Outputs:

@@ -47,3 +47,23 @@ export const predictDocking = (protein_id: string, target_compound: string) =>
 
 export const chat = (messages: ChatMessage[]) =>
   post<{ reply: string; steps: AgentStep[] }>('/agent/chat', { messages })
+
+export type RnaRegion = { start: number; end: number; unpaired: number; seq: string }
+export type RnaSite = { motif: string; start: number; end: number; seq: string; unpaired: number; reason?: string }
+export type RnaLoop = { loop: number; site: RnaSite; result: string; design?: { id?: string; sequence?: string; plddt?: number }; score?: Record<string, unknown> }
+export type RnaResult = {
+  status: 'success' | 'exhausted' | 'needs_compute' | 'failed_inaccessible' | 'failed_no_motif'
+  accessibility: { mfe: number; structure: string; regions: RnaRegion[] }
+  loops: RnaLoop[]
+  note?: string
+  winner?: RnaLoop['design']
+}
+
+export const designRna = (sequence: string, max_loops = 5) =>
+  post<RnaResult>('/rna/design', { sequence, max_loops })
+
+export type PlantScore = { pos: number; ref: string; alt: string; llr: number }
+export type PlantResult = { model: string; results: PlantScore[]; notice: string; interpretation: string }
+
+export const scorePlantVariants = (sequence: string, variants: { pos: number; alt: string }[]) =>
+  post<PlantResult>('/plant/variants', { sequence, variants })

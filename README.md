@@ -12,11 +12,42 @@ One card at a time: project name, target type (protein, mRNA, plant DNA; generic
 
 `POST /lookup` finds sequences when the user has none at hand. `{"type": "mrna", "query": "PUM1"}` searches NCBI RefSeq mRNAs; `{"type": "plantdna", "query": "PHYB"}` searches NCBI Gene for plant genes and fetches the gene's genomic window (first 8,191 bases from the 5' end); `{"type": "compound", "query": "imat"}` autocompletes PubChem compound names. Add `"action": "fetch", "id": "<id from search>"` to get the sequence. Optional env `NCBI_API_KEY` and `NCBI_EMAIL` raise the NCBI rate limit.
 
-## Known binders and AlphaProtein Novo
+## Known binders
 
-On the protein binder step, `POST /lookup` with `{"type": "binder", "query": "<UniProt accession>"}` returns the strongest known ligands for that protein from ChEMBL (open data), ranked by pChEMBL. Unnamed molecules are passed on as `smiles:<SMILES>` and resolved through PubChem when scored.
+On the protein binder step, `POST /lookup` with `{"type": "binder", "query": "<UniProt accession>"}` returns the strongest known ligands for that protein from ChEMBL, ranked by pChEMBL. Unnamed molecules are passed on as `smiles:<SMILES>` and resolved through PubChem when scored.
 
-`POST /novo/design` forwards `{compound, protein_accession}` to your own AlphaProtein Novo host (`NovoUrl` at deploy) at `POST {NovoUrl}/design`, expected to return `{status, designs: [{id, sequence, plddt}], note}`. AP Novo is a de novo enzyme design pipeline (Google DeepMind, Apache 2.0 code). Its weights are downloaded separately under Google's terms of use and prohibited use policy, and it also needs AlphaFold 3 leaving-atom weights under the AlphaFold 3 terms. It needs a GPU, so write a thin wrapper service around its CLI; this repo only holds the client side.
+## Enzyme design: demo and commercial modes (Modal + S3)
+
+The "Design an enzyme" card has a switch. Both modes run as async GPU jobs on Modal and **save everything to S3**: the job syncs `out/` to `s3://<NovoBucket>/novo/<job_id>/` every 60 s with a heartbeat in `job.json`; after a crash Modal retries (3x) on a fresh container that restores from S3, and finished stages are skipped. The API reads status and results from S3, not Modal. A job with no heartbeat for 5 min shows as stalled with a Resume button.
+
+| | Demo | Commercial |
+|---|---|---|
+| Pipeline | AlphaProtein Novo, LigandMPNN, AlphaFold 3 | RFdiffusion2, LigandMPNN, Boltz, OpenMM relax |
+| Input | motif CIF + manifest fields | motif PDB + contigs, fixed atoms, ligand code |
+| Licences | Non-commercial weights; outputs for theoretical modeling only | RFdiffusion2 BSD-3, LigandMPNN MIT, Boltz MIT (code and weights) |
+| Image | `image` (no open stack) | `open_image` (no AP Novo or AlphaFold code) |
+
+For a commercial deployment set `DemoModeEnabled=false` (CI: repo variable `DEMO_MODE_ENABLED=false`) so the API refuses demo jobs, and `VITE_ENABLE_DEMO=false` to hide the button. Not legal advice: before selling, confirm the current terms of every weights file yourself. RFdiffusion2's repo is BSD-3 but states no separate weights licence, and its published env lists PyRosetta (commercially licensed). This image does not install PyRosetta, so if design inference needs it the run will fail instead of quietly using it. Rosetta and ESM3-open are not part of this stack. The Rosetta-style checks come from OpenMM (BSD-like) and PDBFixer (MIT): each folded complex gets ligand clash and contact counts, then the protein is minimised (AMBER14, implicit solvent, weak restraints) and `relax_dE_per_res` and `relax_ca_rmsd` are reported. Only ligand clashes affect the score; the energy is a strain proxy, not a binding energy. Open alternatives checked: Protenix (ByteDance) is Apache 2.0 for code and its released weights and could replace Boltz as the folder (not wired in; Protenix-v2 weights are proprietary); HelixFold3 (Baidu) is non-commercial; Uni-Fold has no ligand support.
+
+Setup, in order:
+
+```bash
+# 1. Backend: creates the bucket, a write-only IAM user and the /novo/* routes
+sam deploy ... --parameter-overrides NovoToken="<random>" NovoAccessCode="<code>"   # add NovoUrl after step 3
+aws iam create-access-key --user-name <NovoWriterUser output>
+
+# 2. Modal secret, then weights for the engine(s) you use
+modal secret create novo-aws AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... AWS_REGION=... NOVO_BUCKET=<NovoBucketName output> NOVO_TOKEN=<same random>
+modal run services/novo/modal_app.py::download_open_weights                  # commercial
+modal run services/novo/modal_app.py::download_weights --accept-terms        # demo only; read its terms first
+
+# 3. Deploy, then redeploy the backend with NovoUrl set to the printed tdry-novo-api URL
+modal deploy services/novo/modal_app.py
+```
+
+CI secrets: `NOVO_URL`, `NOVO_TOKEN`, `NOVO_ACCESS_CODE`. `NOVO_GPU` (default `A100-80GB`) is read at `modal deploy`. Campaign data expires after `NovoRetentionDays` (default 90).
+
+Caveats: neither image build nor a real GPU run has been tested; expect to iterate on the RFdiffusion2 conda env first. Boltz folds in single-sequence mode and downloads its weights into the volume on first run. Ranking is coarse (demo: pLDDT minus motif RMSD; commercial: pLDDT + ligand ipTM minus backbone RMSD); do real filtering before ordering DNA. Smoke-test with 1-2 designs. Relaxing needs a GPU to be quick (`RELAX_ITERS`, default 1000, controls the minimiser; on one CPU core it took about 3 s per iteration).
 
 ## Endpoints
 
@@ -24,6 +55,7 @@ On the protein binder step, `POST /lookup` with `{"type": "binder", "query": "<U
 |---|---|
 | `POST /proteins/search` | `{"query": "caspase-9", "species": "generic"}` |
 | `POST /docking/predict` | `{"protein_id": "P55211", "target_compound": "imatinib"}` |
+| `POST /novo/submit`, `/novo/status`, `/novo/resume`, `/novo/download` | see `backend/src/novo.py` |
 | `POST /agent/chat` | `{"messages": [{"role": "user", "content": "..."}]}` |
 | `POST /rna/design` | `{"sequence": "AUGUUU...", "max_loops": 5, "site": {"motif": "PUM1", "start": 11}}` or `{"sequence": "...", "analyze": true}` for folding and motifs only |
 | `POST /plant/variants` | `{"sequence": "<plant DNA>", "variants": [{"pos": 251, "alt": "C"}]}` |

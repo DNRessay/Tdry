@@ -173,3 +173,9 @@ button.chip:hover { border-color: var(--ink); }
   .print-head { display: block; color: var(--muted); }
   .rows li, .meter-track, .bar { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
+
+.field { display: grid; gap: 0.25rem; flex: 1 1 180px; }
+.field > span { font-size: 0.85rem; color: var(--muted); }
+select { width: 100%; padding: 0.7rem 0.9rem; border: 1.5px solid var(--line); border-radius: 12px; font: inherit; background: #fff; color: var(--ink); }
+.check { display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.9rem; }
+.check input { width: auto; margin-top: 0.25rem; }

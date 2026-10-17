@@ -1,14 +1,15 @@
-import { NovoResult, PlantResult, Prediction, Protein, RnaResult } from '../api'
+import { EnzymeJob, PlantResult, Prediction, Protein, RnaResult } from '../api'
 import Card from './Card'
 import StructureViewer from './StructureViewer'
+import EnzymeResults from './EnzymeResults'
 
 export type ResultData =
   | { kind: 'protein'; data: Prediction }
   | { kind: 'mrna'; data: RnaResult }
   | { kind: 'plantdna'; data: PlantResult }
-  | { kind: 'novo'; data: NovoResult }
+  | { kind: 'enzyme'; data: EnzymeJob }
 
-type Props = { name: string; result: ResultData; protein: Protein | Omit<Protein, 'sequence'> | null; createdAt: number; onBack?: () => void; onAsk: () => void; onRestart: () => void }
+type Props = { name: string; result: ResultData; protein: Protein | Omit<Protein, 'sequence'> | null; createdAt: number; onBack?: () => void; onAsk: () => void; onRestart: () => void; onEnzymeUpdate: (d: EnzymeJob) => void }
 
 function Meter({ label, value }: { label: string; value: number }) {
   return (
@@ -32,7 +33,7 @@ const RNA_HEADLINE: Record<RnaResult['status'], string> = {
   failed_no_motif: 'No known binding motif sits in an open stretch.',
 }
 
-export default function Results({ name, result, protein, createdAt, onBack, onAsk, onRestart }: Props) {
+export default function Results({ name, result, protein, createdAt, onBack, onAsk, onRestart, onEnzymeUpdate }: Props) {
   return (
     <Card question={`Results for ${name}`} wide onBack={onBack}>
       <p className="print-head">
@@ -82,21 +83,7 @@ export default function Results({ name, result, protein, createdAt, onBack, onAs
           {result.data.winner?.sequence && <textarea readOnly rows={3} value={result.data.winner.sequence} aria-label="Winning protein sequence" />}
         </>
       )}
-      {result.kind === 'novo' && (
-        <>
-          <p className="verdict">{result.data.designs?.length ? `AlphaProtein Novo returned ${result.data.designs.length} designs.` : 'AlphaProtein Novo returned no designs.'}</p>
-          {result.data.note && <p className="muted">{result.data.note}</p>}
-          <ul className="plain">
-            {(result.data.designs ?? []).map((d, i) => (
-              <li key={d.id ?? i}>
-                <strong>{d.id ?? `Design ${i + 1}`}</strong>
-                {d.plddt != null && <span className="muted"> pLDDT {d.plddt}</span>}
-                {d.sequence && <textarea readOnly rows={3} value={d.sequence} aria-label="Designed sequence" />}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      {result.kind === 'enzyme' && <EnzymeResults data={result.data} onUpdate={onEnzymeUpdate} />}
       {result.kind === 'plantdna' && (
         <>
           <p className="verdict">Most disruptive mutations first.</p>

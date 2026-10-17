@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Protein, RnaAnalysis, RnaSite } from './api'
+import { EnzymeJob, Protein, RnaAnalysis, RnaSite } from './api'
 import NameStep from './components/NameStep'
 import KindStep, { Kind } from './components/KindStep'
 import ProteinTarget from './components/ProteinTarget'
 import MrnaTarget from './components/MrnaTarget'
 import PlantTarget from './components/PlantTarget'
 import Binder from './components/Binder'
+import EnzymeDesign from './components/EnzymeDesign'
 import Results, { ResultData } from './components/Results'
 import AgentChat from './components/AgentChat'
 import { KIND_LABEL, SavedProject, loadProjects, newId, persist } from './store'
@@ -14,7 +15,7 @@ const STEPS = ['Name', 'Target', 'Details', 'Binder', 'Results']
 
 function summarize(r: ResultData, protein: Protein | null, site: RnaSite | null): string {
   if (r.kind === 'protein') return `${protein?.name ?? 'Protein'} vs ${r.data.ligand.query}, affinity ${r.data.binding_affinity_pct}%`
-  if (r.kind === 'novo') return `Novo designs for ${protein?.name ?? 'compound'}`
+  if (r.kind === 'enzyme') return r.data.status === 'done' ? `${r.data.designs?.length ?? 0} enzyme designs` : `Enzyme campaign, ${r.data.status}`
   if (r.kind === 'mrna') return `${site?.motif ?? 'mRNA'} site, ${r.data.status.replace(/_/g, ' ')}`
   return `${r.data.results.length} mutations scored`
 }
@@ -28,6 +29,7 @@ export default function App() {
   const [analysis, setAnalysis] = useState<RnaAnalysis | null>(null)
   const [site, setSite] = useState<RnaSite | null>(null)
   const [result, setResult] = useState<ResultData | null>(null)
+  const [enzymeMode, setEnzymeMode] = useState(false)
   const [chat, setChat] = useState(false)
   const [history, setHistory] = useState(false)
   const [projects, setProjects] = useState<SavedProject[]>(loadProjects)
@@ -48,6 +50,7 @@ export default function App() {
     setViewing(null)
     setChat(false)
     setHistory(false)
+    setEnzymeMode(false)
   }
 
   function finish(r: ResultData) {
@@ -56,7 +59,7 @@ export default function App() {
     const saved: SavedProject = {
       id,
       name,
-      kind: r.kind === 'novo' ? 'novo' : kind!,
+      kind: r.kind === 'enzyme' ? 'enzyme' : kind!,
       createdAt: prev?.createdAt ?? Date.now(),
       protein: protein ? { ...protein, sequence: undefined } as SavedProject['protein'] : null,
       summary: summarize(r, protein, site),
@@ -73,11 +76,17 @@ export default function App() {
     setCurrentId(p.id)
     setName(p.name)
     setResult(p.result)
-    setKind(p.kind === 'novo' ? 'protein' : p.kind)
+    setKind(p.kind === 'enzyme' ? 'protein' : p.kind)
     setProtein(p.protein ? ({ ...p.protein, sequence: '' } as Protein) : null)
     setStep(4)
     setHistory(false)
     setChat(false)
+  }
+
+  function updateEnzyme(d: EnzymeJob) {
+    const r: ResultData = { kind: 'enzyme', data: d }
+    setResult(r)
+    setProjects((prev) => persist(prev.map((p) => (p.result.kind === 'enzyme' && p.result.data.job_id === d.job_id ? { ...p, result: r, summary: summarize(r, null, null) } : p))))
   }
 
   function remove(id: string) {
@@ -139,9 +148,10 @@ export default function App() {
           <MrnaTarget seq={seq} setSeq={setSeq} analysis={analysis} setAnalysis={setAnalysis} site={site} setSite={setSite} onNext={() => setStep(3)} onBack={back} />
         )}
         {step === 2 && kind === 'plantdna' && <PlantTarget seq={seq} setSeq={setSeq} onNext={() => setStep(3)} onBack={back} />}
-        {step === 3 && kind && <Binder kind={kind} protein={protein} seq={seq} site={site} onBack={back} onDone={finish} />}
+        {step === 3 && kind && enzymeMode && <EnzymeDesign name={name} onBack={() => setEnzymeMode(false)} onDone={finish} />}
+        {step === 3 && kind && !enzymeMode && <Binder kind={kind} protein={protein} seq={seq} site={site} onBack={back} onDone={finish} onEnzyme={() => setEnzymeMode(true)} />}
         {step === 4 && result && shown && (
-          <Results name={name} result={result} protein={protein} createdAt={shown.createdAt} onBack={viewing ? undefined : back} onAsk={() => setChat(true)} onRestart={restart} />
+          <Results name={name} result={result} protein={protein} createdAt={shown.createdAt} onBack={viewing ? undefined : back} onAsk={() => setChat(true)} onRestart={restart} onEnzymeUpdate={updateEnzyme} />
         )}
       </main>
 

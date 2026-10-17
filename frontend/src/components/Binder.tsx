@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { designNovo, designRna, LookupHit, lookupSearch, predictDocking, scorePlantVariants, Protein, RnaSite } from '../api'
+import { designRna, LookupHit, lookupSearch, predictDocking, scorePlantVariants, Protein, RnaSite } from '../api'
 import Card from './Card'
 import { Kind } from './KindStep'
 import { clean } from './PlantTarget'
@@ -12,6 +12,7 @@ type Props = {
   site: RnaSite | null
   onDone: (r: ResultData) => void
   onBack: () => void
+  onEnzyme: () => void
 }
 
 function parseVariants(text: string, seq: string) {
@@ -27,7 +28,7 @@ function parseVariants(text: string, seq: string) {
   })
 }
 
-export default function Binder({ kind, protein, seq, site, onDone, onBack }: Props) {
+export default function Binder({ kind, protein, seq, site, onDone, onBack, onEnzyme }: Props) {
   const [compound, setCompound] = useState('')
   const [loops, setLoops] = useState(5)
   const [vtext, setVtext] = useState('')
@@ -82,7 +83,7 @@ export default function Binder({ kind, protein, seq, site, onDone, onBack }: Pro
 
   if (kind === 'protein')
     return (
-      <Card question="Which compound should it bind?" hint="Start from a known binder, type a PubChem name or CID, or ask AlphaProtein Novo for a new design. Scores are a quick pre-screen, not physics-based docking." wide onBack={onBack}>
+      <Card question="Which compound should it bind?" hint="Start from a known binder, type a PubChem name or CID, or design a new enzyme from a motif file. Scores are a quick pre-screen, not physics-based docking." wide onBack={onBack}>
         <h3>Known binders for {protein?.name}</h3>
         {known === null && <p className="muted">Looking up ChEMBL…</p>}
         {known && !known.length && <p className="muted">ChEMBL has no measured binders for this protein. Type a compound below.</p>}
@@ -115,8 +116,8 @@ export default function Binder({ kind, protein, seq, site, onDone, onBack }: Pro
         </div>
         {error && <p className="error">{error}</p>}
         <div className="actions">
-          <button className="ghost" disabled={busy || !compound.trim() || compound.startsWith('smiles:')} onClick={() => go(async () => ({ kind: 'novo', data: await designNovo(compound.trim(), protein?.accession) }))}>
-            Design a new one with Novo
+          <button className="ghost" disabled={busy} onClick={onEnzyme}>
+            Design an enzyme
           </button>
           <button disabled={busy || !compound.trim() || !protein} onClick={() => go(async () => ({ kind: 'protein', data: await predictDocking(protein!.accession, compound.trim()) }))}>
             {busy ? 'Working…' : 'Score it'}

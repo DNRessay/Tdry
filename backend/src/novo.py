@@ -20,17 +20,23 @@ NOTICE = (
     "Designs come from AlphaProtein Novo and are subject to the AP Novo Generator Output Terms of Use. "
     "For theoretical modeling only; ranking here is a coarse sort of pLDDT and motif RMSD."
 )
-s3 = boto3.client("s3")
+
+
+def get_s3():
+    region = os.environ.get("AWS_REGION", "us-east-1")
+    return boto3.client("s3", region_name=region)
 
 
 def _get(key):
+    s3 = get_s3()
     try:
         return json.loads(s3.get_object(Bucket=BUCKET, Key=key)["Body"].read())
-    except s3.exceptions.NoSuchKey:
+    except Exception:
         return None
 
 
 def _put(key, body, ctype="application/json"):
+    s3 = get_s3()
     s3.put_object(Bucket=BUCKET, Key=key, Body=body if isinstance(body, bytes) else json.dumps(body).encode(), ContentType=ctype)
 
 
@@ -60,7 +66,10 @@ def _common(data):
     """Fields shared by both engines. Returns a dict of validated values."""
     motif_str = (data.get("motif_str") or "").strip()
     atoms = (data.get("motif_atoms") or "").strip()
-    n = int(data.get("num_designs") or 0)
+    try:
+        n = int(data.get("num_designs") or 0)
+    except (ValueError, TypeError):
+        raise ApiError(400, "num_designs must be an integer between 1 and 300")
     _check(1 <= n <= 300, "num_designs must be 1-300")
     ligands = data.get("ligands") or []
     _check(isinstance(ligands, list) and len(ligands) <= 3, "up to 3 ligands")
@@ -80,9 +89,15 @@ def _demo_inputs(data):
     _check(not seq_len or re.fullmatch(r"\d{1,4}(-\d{1,4})?", seq_len), "seq_length must be 150 or 120-160")
     unidx = (data.get("unindexed_motif_residues") or "").strip()
     _check(not unidx or re.fullmatch(r"[A-Za-z0-9,\-\s]{1,200}", unidx), "unindexed_motif_residues looks invalid")
-    steps = int(data.get("num_sampling_steps") or 1000)
+    try:
+        steps = int(data.get("num_sampling_steps") or 1000)
+    except (ValueError, TypeError):
+        raise ApiError(400, "num_sampling_steps must be an integer")
     _check(50 <= steps <= 1000, "num_sampling_steps must be 50-1000")
-    seeds = int(data.get("fold_seeds") or 1)
+    try:
+        seeds = int(data.get("fold_seeds") or 1)
+    except (ValueError, TypeError):
+        raise ApiError(400, "fold_seeds must be an integer")
     _check(1 <= seeds <= 5, "fold_seeds must be 1-5")
     suite = data.get("suite") or None
     _check(suite is None or suite in SUITES, f"suite must be one of {sorted(SUITES)}")
@@ -123,7 +138,10 @@ def _open_inputs(data):
         m = re.fullmatch(r"([A-Za-z]\d{1,5}):([A-Z0-9',]{1,60})", tok)
         _check(m, "fixed atoms look invalid, e.g. A106:NE,CD,CZ A166:OD1,CG")
         contig_atoms[m.group(1)] = m.group(2)
-    per = int(data.get("seqs_per_design") or 4)
+    try:
+        per = int(data.get("seqs_per_design") or 4)
+    except (ValueError, TypeError):
+        raise ApiError(400, "seqs_per_design must be an integer")
     _check(1 <= per <= 8, "seqs_per_design must be 1-8")
     cfg = {"engine": "open", "contigs": motif_str, "contig_atoms": contig_atoms, "unindexed": bool(data.get("unindexed")),
            "ligands": [l["ccd_code"].upper() for l in ligands], "num_designs": n, "seqs_per_design": per}
@@ -159,9 +177,9 @@ def submit(data):
     _put(p + "job.json", job)
     try:
         _launch("submit", jid)
-    except ApiError:
+    except Exception as e:
         # Inputs are saved; the user can press Resume once the launcher is reachable.
-        job.update(status="error", error="Saved, but the GPU launcher could not be reached. Press Resume.")
+        job.update(status="error", error=f"Saved, but the GPU launcher could not be reached: {str(e)[:200]}. Press Resume.")
         _put(p + "job.json", job)
     return {"job_id": jid}
 
@@ -203,5 +221,6 @@ def download(data):
     if not key.startswith("out/") or ".." in key:
         raise ApiError(400, "invalid key")
     full = f"novo/{jid}/{key}"
+    s3 = get_s3()
     url = s3.generate_presigned_url("get_object", Params={"Bucket": BUCKET, "Key": full}, ExpiresIn=3600)
     return {"url": url}

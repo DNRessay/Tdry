@@ -9,7 +9,7 @@ export type ResultData =
   | { kind: 'plantdna'; data: PlantResult }
   | { kind: 'enzyme'; data: EnzymeJob }
 
-type Props = { name: string; result: ResultData; protein: Protein | Omit<Protein, 'sequence'> | null; createdAt: number; onBack?: () => void; onAsk: () => void; onRestart: () => void; onEnzymeUpdate: (d: EnzymeJob) => void }
+type Props = { name: string; result: ResultData; protein: Protein | Omit<Protein, 'sequence'> | null; createdAt: number; onBack?: () => void; onAsk: () => void; onRestart: () => void; onEnzymeUpdate?: (d: EnzymeJob) => void }
 
 function Meter({ label, value }: { label: string; value: number }) {
   return (
@@ -83,7 +83,7 @@ export default function Results({ name, result, protein, createdAt, onBack, onAs
           {result.data.winner?.sequence && <textarea readOnly rows={3} value={result.data.winner.sequence} aria-label="Winning protein sequence" />}
         </>
       )}
-      {result.kind === 'enzyme' && <EnzymeResults data={result.data} onUpdate={onEnzymeUpdate} />}
+      {result.kind === 'enzyme' && <EnzymeResults data={result.data} onUpdate={onEnzymeUpdate ?? (() => {})} />}
       {result.kind === 'plantdna' && (
         <>
           <p className="verdict">Most disruptive mutations first.</p>
